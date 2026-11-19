@@ -48,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     a = sub.add_parser("api")
     a.add_argument("--workers", type=int, default=1)
     a.add_argument("--port", type=int)
+    a.add_argument("--host", help="adresse d'écoute (0.0.0.0 dans un conteneur Docker)")
     args = parser.parse_args(argv)
 
     if args.cmd == "setup":
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         import uvicorn
         from bikeml.config import get_config
         cfg = get_config()
-        uvicorn.run("bikeml.api.main:app", host=cfg.api["host"],
+        uvicorn.run("bikeml.api.main:app", host=args.host or cfg.api["host"],
                     port=args.port or cfg.api["port"], workers=args.workers)
     return 0
 

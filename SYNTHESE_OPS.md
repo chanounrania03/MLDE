@@ -18,6 +18,7 @@ Les chiffres ci-dessous proviennent de l'exécution complète enregistrée dans 
 | Modèle | HistGradientBoosting, cible log(1+cnt), pondération par l'ancienneté (demi-vie 30 j) | rapide, gère les interactions heure × jour ouvré ; la pondération et l'exclusion de `mnth`/`season` répondent à la forte croissance de la demande 2011 → 2012 (RMSE moyen sur les 12 évaluations mensuelles : 72,8 contre 119,4 avec toutes les variables et 130,5 pour la référence naïve) |
 | Évaluation | découpage temporel (28 derniers jours) | imite l'usage réel ; un découpage aléatoire serait trop optimiste |
 | Mise en service | 3 règles : RMSE < 200 ; meilleur que la référence naïve ; ≤ champion × 1,02 **sur la même période** | les erreurs de mois différents ne sont pas comparables (saisonnalité) |
+| Déploiement | Docker : une image, 4 services (MLflow, pipeline, API, dashboard) via `docker-compose.yml`, volumes pour les données et le registre | reproductible sur n'importe quel poste ; MLflow 3 lancé avec `--allowed-hosts` pour accepter les appels des autres conteneurs |
 | Échec de dépendance | API démarrée en mode dégradé (503 explicite), délais HTTP bornés, ancien modèle conservé si un rechargement échoue | un registre en panne ne doit pas rendre l'API indisponible ni la bloquer au démarrage |
 | Rejeu des données | lot initial 2011 + un lot par mois de 2012 | permet de démontrer l'arrivée de nouvelles données, le réentraînement et les décisions de promotion |
 
@@ -85,4 +86,4 @@ Les extrapolations sont à valider sur l'infrastructure cible avec `python scrip
 - Pas de détection de dérive des entrées (seule la qualité via feedback est suivie).
 - `/admin/reload` n'est protégé que par un jeton partagé optionnel (`BIKEML_ADMIN_TOKEN`) ; en production il faudrait une vraie authentification et HTTPS.
 - Mesures de charge réalisées sur un poste de développement.
-- Pas de conteneurisation ni d'intégration continue (pistes : Dockerfile/docker-compose, GitHub Actions lançant `pytest`).
+- Pas d'intégration continue (piste : GitHub Actions lançant `pytest` et la construction de l'image Docker).

@@ -1,18 +1,24 @@
-# On part d'une image Python officielle légère
-FROM python:3.11-slim
+# Image unique du projet : elle sert à l'API, au pipeline, au dashboard et au
+# serveur MLflow (seule la commande change, voir docker-compose.yml).
+FROM python:3.12-slim
 
-# On définit le dossier de travail
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    # un worker = un cœur : évite que les threads OpenMP se disputent le CPU
+    OMP_NUM_THREADS=1
+
 WORKDIR /app
 
-# On copie les dépendances et on les installe
+# Dépendances d'abord (couche mise en cache tant que requirements.txt ne change pas)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# On copie tout le code du projet
+# Code du projet, puis installation du paquet bikeml
 COPY . .
+RUN pip install --no-cache-dir -e . --no-deps
 
-# On expose le port 8000
-EXPOSE 8000
+# API, dashboard, serveur MLflow
+EXPOSE 8000 8501 5000
 
-# La commande pour lancer l'API
-CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Par défaut : l'API, à l'écoute de toutes les interfaces du conteneur
+CMD ["python", "-m", "bikeml", "api", "--host", "0.0.0.0"]

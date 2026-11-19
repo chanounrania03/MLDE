@@ -4,6 +4,8 @@ Chaîne MLOps complète et exécutable en local : ingestion de données vérifi�
 
 Le modèle est volontairement simple ; l'objet du projet est la chaîne opérationnelle autour de lui.
 
+**Binôme :** Rania Chanoun et Andriamah — projet issu de la fusion de nos deux travaux (voir §9).
+
 - **Notebook de démonstration commenté :** [`notebooks/projet_mlops_velos.ipynb`](notebooks/projet_mlops_velos.ipynb) — exécutable en local **ou sur Google Colab** (voir §4)
 - **Synthèse des choix et résultats OPS :** [`SYNTHESE_OPS.md`](SYNTHESE_OPS.md)
 
@@ -132,9 +134,29 @@ prefect server start                   # http://127.0.0.1:4200
 python -m bikeml serve                 # déploiement planifié toutes les 30 s
 ```
 
+### Avec Docker (déploiement complet)
+
+Une seule image sert à quatre services : serveur MLflow (registre + artefacts), pipeline (`watch`), API et dashboard.
+
+```bash
+docker compose up -d --build                                   # démarre les 4 services
+docker compose run --rm pipeline python -m bikeml setup        # données + lots de rejeu
+docker compose run --rm pipeline python -m bikeml release      # livre le lot 2011
+# le service pipeline détecte le lot, entraîne, promeut ; l'API recharge le champion
+docker compose run --rm pipeline python -m bikeml release      # mois suivant, etc.
+docker compose logs -f pipeline                                # suivre les traitements
+```
+
+API : <http://localhost:8000/docs> · dashboard : <http://localhost:8501> · MLflow : <http://localhost:5000>
+
+- Les données et la base des traces vivent dans le volume `bikeml-data`, le registre MLflow dans `mlflow-data` : ils survivent à un redémarrage des conteneurs.
+- MLflow 3 refuse les en-têtes `Host` inconnus (protection DNS rebinding) : le serveur est lancé avec `--allowed-hosts mlflow:5000,...`, sinon les autres conteneurs reçoivent une erreur 403.
+- Incident « dépendance indisponible » : `docker compose stop mlflow` → l'API garde le modèle chargé, un rechargement renvoie 503 et une alerte ; `docker compose start mlflow` puis `POST /admin/reload` rétablit tout.
+- Chaque worker de l'API est limité à un thread de calcul (`OMP_NUM_THREADS=1`).
+
 ### Repartir de zéro
 
-`make reset` (ou supprimer `data/`, `mlruns/`, `mlflow.db`, `reports/validation/`).
+`make reset` (ou supprimer `data/`, `mlruns/`, `mlflow.db`, `reports/validation/`). Avec Docker : `docker compose down -v` (supprime aussi les volumes).
 
 ## 6. Configuration et secrets
 
@@ -161,8 +183,24 @@ tests/                       tests automatisés
 notebooks/                   démonstration commentée
 reports/load_tests/          derniers résultats de charge
 docs/                        captures du dashboard
+Dockerfile                   image unique (API, pipeline, dashboard, MLflow)
+docker-compose.yml           déploiement local des 4 services
+.streamlit/config.toml       thème du dashboard
 ```
 
 ## 8. Citation
 
 Fanaee-T, H. & Gama, J. (2013). *Event labeling combining ensemble detectors and background knowledge.* Progress in Artificial Intelligence, 2, 113-127. Données : UCI Machine Learning Repository, licence CC BY 4.0.
+
+## 9. Fusion des deux projets du binôme
+
+Le dépôt réunit deux travaux menés en parallèle sur le même sujet :
+
+| Apport | Origine | Ce qui a été repris / adapté |
+|---|---|---|
+| Chaîne MLOps complète (paquet `bikeml`, rejeu par lots, contrôles bloquants, Prefect, registre et règles de promotion, rollback, API tracée, feedbacks, supervision, charge, 33 tests, notebook) | Rania Chanoun | base du dépôt |
+| Conteneurisation (Dockerfile, `.dockerignore`) et correction de l'en-tête `Host` refusé par MLflow 3 | Andriamah | étendue en `docker-compose.yml` à 4 services (MLflow, pipeline, API, dashboard) |
+| Thème et mise en forme du dashboard Streamlit (cartes de métriques) | Andriamah | appliqués au dashboard à 5 onglets |
+| Modèle RandomForest (toutes variables, découpage aléatoire 80/20, RMSE 50,1) | Andriamah | conservé comme **expérience de comparaison** dans le notebook (§5) : évalué en découpage temporel, son RMSE passe à 75,0, ce qui justifie le choix d'une évaluation temporelle |
+
+L'historique Git des deux contributions est conservé.

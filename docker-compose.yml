@@ -1,0 +1,86 @@
+# Déploiement local complet : serveur MLflow + pipeline + API + dashboard.
+#
+#   docker compose up -d --build                    # démarre tout
+#   docker compose run --rm pipeline python -m bikeml setup     # données + lots
+#   docker compose run --rm pipeline python -m bikeml release   # livre un lot
+#   -> le service `pipeline` (watch) le détecte, entraîne et promeut ;
+#      l'API recharge le champion automatiquement.
+#
+# Interfaces : API http://localhost:8000/docs · dashboard http://localhost:8501
+#              MLflow http://localhost:5000
+#
+# Incident « dépendance indisponible » : docker compose stop mlflow
+
+x-bikeml: &bikeml
+  build: .
+  image: velo-mlops:latest
+  restart: unless-stopped
+  environment:
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    BIKEML_API_URL: http://api:8000
+    BIKEML_ADMIN_TOKEN: ${BIKEML_ADMIN_TOKEN:-}
+    ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+  volumes:
+    - bikeml-data:/app/data          # lots, quarantaine, base des traces ops.db
+    - ./reports:/app/reports         # rapports de validation et de charge
+
+services:
+  mlflow:
+    <<: *bikeml
+    # Registre et suivi des modèles. Les artefacts transitent par le serveur
+    # (--serve-artifacts) : les autres conteneurs n'ont pas besoin d'y accéder.
+    # MLflow 3 refuse par défaut les en-têtes Host inconnus : on autorise le nom
+    # du service dans le réseau Docker (mlflow:5000) et l'accès depuis l'hôte.
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
+      --host 0.0.0.0 --port 5000
+      --allowed-hosts mlflow:5000,mlflow,localhost:5000,127.0.0.1:5000
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    <<: *bikeml
+    command: python -m bikeml api --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  pipeline:
+    <<: *bikeml
+    # Déclenchement automatique : surveille data/incoming toutes les 30 s
+    command: python -m bikeml watch
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  dashboard:
+    <<: *bikeml
+    command: >
+      streamlit run dashboard/app.py
+      --server.address 0.0.0.0 --server.port 8501 --server.headless true
+    ports:
+      - "8501:8501"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+volumes:
+  bikeml-data:
+  mlflow-data:

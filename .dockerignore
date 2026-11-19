@@ -1,9 +1,15 @@
+# Environnement local
 .venv/
 __pycache__/
 *.pyc
-mlruns/
-data/raw/
-predictions.log
-feedbacks.log
 .pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
 .git/
+.env
+# Données et artefacts générés (ils vivent dans des volumes Docker)
+data/
+mlruns/
+mlartifacts/
+mlflow.db
+reports/validation/
