@@ -49,19 +49,19 @@ Les chiffres ci-dessous proviennent de l'exécution complète enregistrée dans 
 
 | Workers | Utilisateurs | Débit (req/s) | p50 (ms) | p95 (ms) | p99 (ms) | Erreurs | CPU moyen | RAM max |
 |---|---|---|---|---|---|---|---|---|
-| 1 | 10 | 53,1 | 50 | 160 | 210 | 0 % | 77 % | 384 Mo |
-| 1 | 25 | 56,3 | 330 | 520 | 600 | 0 % | 98 % | 391 Mo |
-| 1 | 50 | 55,6 | 750 | 1000 | 1200 | 0 % | 98 % | 398 Mo |
-| 2 | 10 | 63,9 | 23 | 71 | 120 | 0 % | 78 % | 803 Mo |
-| 2 | 25 | 93,6 | 110 | 360 | 530 | 0 % | 138 % | 811 Mo |
-| 2 | 50 | 91,9 | 390 | 860 | 1100 | 0 % | 141 % | 823 Mo |
+| 1 | 10 | 53,2 | 51 | 150 | 190 | 0 % | 78 % | 327 Mo |
+| 1 | 25 | 52,2 | 360 | 550 | 730 | 0 % | 93 % | 335 Mo |
+| 1 | 50 | 58,6 | 730 | 940 | 1100 | 0 % | 100 % | 342 Mo |
+| 2 | 10 | 64,8 | 22 | 74 | 110 | 0 % | 82 % | 691 Mo |
+| 2 | 25 | 101,6 | 95 | 280 | 440 | 0 % | 148 % | 697 Mo |
+| 2 | 50 | 91,7 | 410 | 740 | 1200 | 0 % | 140 % | 709 Mo |
 
 (CPU en % d'un cœur : 100 % = un cœur plein. API et générateur de charge sur la même machine : chiffres pessimistes. Une campagne antérieure sur une machine de 2 vCPU plus rapide par cœur donnait environ deux fois plus de débit : les valeurs absolues sont à refaire sur la machine cible.)
 
 **Lecture.**
-- Le service est **limité par le CPU** : un worker plafonne vers 56 req/s (un cœur saturé) ; au-delà, les requêtes attendent en file et la latence monte, **sans erreur**.
-- Le 2e worker porte le débit maximal de 56 à 94 req/s (**× 1,66**) et ramène la p95 de 160 à 71 ms à 10 utilisateurs.
-- La mémoire croît d'environ **400 Mo par worker** ; elle n'est jamais le facteur limitant.
+- Le service est **limité par le CPU** : un worker plafonne vers 55-59 req/s (un cœur saturé) ; au-delà, les requêtes attendent en file et la latence monte, **sans erreur**.
+- Le 2e worker porte le débit maximal de 59 à 102 req/s (**× 1,73**) et ramène la p95 de 150 à 74 ms à 10 utilisateurs.
+- La mémoire croît d'environ **350 Mo par worker** ; elle n'est jamais le facteur limitant.
 - Optimisation appliquée grâce aux mesures : `OMP_NUM_THREADS=1` par worker. Sans elle, chaque prédiction lançait un pool de threads sur tous les cœurs (1 worker, 10 utilisateurs : CPU 138 % → 76 %, p50 120 → 57 ms).
 
 ## 4. Dimensionnement recommandé
@@ -70,9 +70,9 @@ Demande : ≈ 6,4 req/s par utilisateur actif (attente moyenne de 125 ms). Capac
 
 | Charge visée | Recommandation | Justification |
 |---|---|---|
-| ≈ 10 utilisateurs (≈ 64 req/s) | **2 workers, 2 vCPU, 1 Go** | p95 mesurée 71 ms ; 1 worker tient le SLO de justesse (p95 160 ms) mais sature déjà |
-| ≈ 25 utilisateurs (≈ 160 req/s) | **≈ 5 workers / 5 vCPU, ~2 Go, sur 2 instances** | extrapolation : aucune config. testée ne tient le SLO (2 workers : p95 360 ms) |
-| ≈ 50 utilisateurs (≈ 320 req/s) | **≈ 9-10 workers : 3 instances de 3-4 vCPU, ~4 Go** | extrapolation (2 workers : p95 860 ms) |
+| ≈ 10 utilisateurs (≈ 65 req/s) | **2 workers, 2 vCPU, 1 Go** | p95 mesurée 74 ms ; 1 worker tient le SLO de justesse (p95 150 ms) mais sature déjà |
+| ≈ 25 utilisateurs (≈ 160 req/s) | **≈ 5 workers / 5 vCPU, ~2 Go, sur 2 instances** | extrapolation : aucune config. testée ne tient le SLO (2 workers : p95 280 ms) |
+| ≈ 50 utilisateurs (≈ 320 req/s) | **≈ 9-10 workers : 3 instances de 3-4 vCPU, ~4 Go** | extrapolation (2 workers : p95 740 ms) |
 
 Les extrapolations sont à valider sur l'infrastructure cible avec `python scripts/run_load_tests.py --workers 1 2 4`.
 
