@@ -12,6 +12,7 @@ Toutes les données viennent de data/ops.db, du registre MLflow et de reports/.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -19,12 +20,32 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+# Registre MLflow injoignable : on échoue vite (comme l'API) au lieu de bloquer
+# tout le dashboard plusieurs minutes pendant les tentatives de reconnexion.
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "1")
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "5")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from bikeml.config import get_config  # noqa: E402
 
 cfg = get_config()
 st.set_page_config(page_title="Supervision vélos", layout="wide")
+# Mise en forme (thème dans .streamlit/config.toml) : indicateurs présentés en cartes.
+st.markdown("""
+    <style>
+    .block-container {padding-top: 2rem;}
+    h1 {color: #1E293B; font-weight: 700;}
+    div[data-testid="stMetric"] {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    div[data-testid="stMetricValue"] {color: #0F172A; font-weight: bold;}
+    </style>
+""", unsafe_allow_html=True)
 st.title("Supervision - prévision de la demande de vélos")
 
 
