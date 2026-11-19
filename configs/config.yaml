@@ -1,0 +1,98 @@
+# Configuration centrale du projet.
+# Tous les chemins sont relatifs à la racine du dépôt.
+# Les valeurs sensibles (webhook d'alerte, URI distante...) passent par des
+# variables d'environnement, jamais par ce fichier.
+
+project:
+  name: velo-mlops
+  random_seed: 42
+
+paths:
+  raw_dir: data/raw              # fichier source téléchargé + fiche de provenance
+  batches_dir: data/batches      # lots historiques préparés (rejeu)
+  incoming_dir: data/incoming    # "boîte aux lettres" : un fichier = un lot qui arrive
+  accepted_dir: data/accepted    # lots validés, utilisés pour l'entraînement
+  quarantine_dir: data/quarantine  # lots rejetés par les contrôles qualité
+  ops_db: data/ops.db            # base SQLite des traces d'exécution et d'utilisation
+  reports_dir: reports
+
+data:
+  # Source officielle (UCI). Le miroir sert de repli si le site UCI est
+  # inaccessible ; le fichier est le même (vérifié par l'empreinte SHA-256).
+  source_url: https://archive.ics.uci.edu/static/public/275/bike+sharing+dataset.zip
+  mirror_url: https://raw.githubusercontent.com/deep-learning-with-pytorch/dlwpt-code-2e/main/data/p1ch4/bike-sharing-dataset/hour.csv
+  expected_sha256: b03a2d02e8c10f435c43c7f0b358b7e34a003afea53dbc37f0183f2763295133
+  file_name: hour.csv
+  license: CC BY 4.0
+  # Rejeu : 2011 sert de socle initial, puis 2012 arrive mois par mois.
+  initial_period_end: "2011-12-31"
+  batch_frequency: M
+
+validation:
+  min_rows: 100
+  max_missing_ratio: 0.0
+  max_duplicate_ratio: 0.0
+  required_columns: [dteday, season, yr, mnth, hr, holiday, weekday, workingday,
+                     weathersit, temp, atemp, hum, windspeed, casual, registered, cnt]
+  ranges:
+    season: [1, 4]
+    yr: [0, 1]
+    mnth: [1, 12]
+    hr: [0, 23]
+    holiday: [0, 1]
+    weekday: [0, 6]
+    workingday: [0, 1]
+    weathersit: [1, 4]
+    temp: [0.0, 1.0]
+    atemp: [0.0, 1.0]
+    hum: [0.0, 1.0]
+    windspeed: [0.0, 1.0]
+    casual: [0, 5000]
+    registered: [0, 5000]
+    cnt: [0, 5000]
+
+model:
+  name: bike-demand
+  # mnth et season sont volontairement exclues : elles attachent la prédiction au
+  # niveau de demande de l'année précédente (forte croissance 2011 -> 2012).
+  features: [hr, holiday, weekday, workingday, weathersit, temp, atemp, hum, windspeed]
+  categorical: [weathersit]
+  # Pondération des observations : le poids d'une heure est divisé par 2 tous
+  # les N jours d'ancienneté, pour suivre l'évolution de la demande.
+  recency_half_life_days: 30
+  target: cnt
+  params:
+    max_iter: 300
+    learning_rate: 0.08
+    max_leaf_nodes: 31
+    min_samples_leaf: 20
+  holdout_days: 28       # les 28 derniers jours disponibles servent d'évaluation
+
+promotion:
+  max_rmse: 200          # garde-fou absolu : au-delà, le modèle est jugé aberrant
+  tolerance: 0.02        # le challenger peut être jusqu'à 2 % moins bon que le champion
+  champion_alias: champion
+  previous_alias: previous
+
+mlflow:
+  tracking_uri: sqlite:///mlflow.db   # surchargeable par MLFLOW_TRACKING_URI
+  experiment: velo-demand
+
+orchestration:
+  retries: 2
+  retry_delay_seconds: 5
+  watch_interval_seconds: 30
+
+api:
+  host: 127.0.0.1
+  port: 8000
+  max_batch_size: 500
+  model_refresh_seconds: 0   # 0 = pas de rechargement automatique (/admin/reload)
+
+load_test:
+  duration_seconds: 20
+  spawn_rate: 20
+  workers: [1, 2]
+  users: [10, 25, 50]
+  slo_p95_ms: 200
+  slo_error_rate: 0.01

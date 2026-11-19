@@ -1,7 +1,0 @@
-data:
-  url: "https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip"
-  raw_path: "data/raw/hour.csv"
-  valid:
-    min_temp: -10.0
-    max_temp: 50.0
-    min_count: 0

@@ -1,8 +1,16 @@
+# données et artefacts générés (reproductibles via `make setup` / `make pipeline`)
+data/
+mlruns/
+mlartifacts/
+mlflow.db
+reports/validation/
+reports/load_tests/*_stats_history.csv
+reports/load_tests/*_failures.csv
+reports/load_tests/*_exceptions.csv
+# environnement
 .venv/
 __pycache__/
-*.pyc
-mlruns/
-data/raw/
-predictions.log
-feedbacks.log
+*.egg-info/
 .pytest_cache/
+.ipynb_checkpoints/
+.env
